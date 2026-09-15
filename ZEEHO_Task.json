@@ -1,0 +1,7 @@
+{
+  "name": "ZEEHO 极核 任务合集",
+  "description": "ZEEHO 极核 App 每日自动签到。使用方法见仓库 README。",
+  "task": [
+    "30 8 * * * https://raw.githubusercontent.com/MonicaGmm/zeeho-quanx/main/task/zeeho_checkin.js, tag=ZEEHO极核签到, enabled=true"
+  ]
+}
