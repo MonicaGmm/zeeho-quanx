@@ -1,0 +1,15 @@
+; ============================================================================
+;  ZEEHO 极核 · TOKENS 抓取
+;  ---------------------------------------------------------------------------
+;  这个文件由合集任务的 addons 字段自动导入，不需要手动添加。
+;
+;  作用：监听 ZEEHO App 里 h5.zeehoev.com 的请求，
+;        把 Authorization 头（或 H5 页面地址里的 ?token=）交给
+;        zeeho_token.js 保存下来，供签到脚本使用。
+;
+;  前提：QX 的「重写」和「MitM」开关要打开，且已安装并信任 MitM 根证书。
+; ============================================================================
+
+hostname = h5.zeehoev.com
+
+^https?://h5\.zeehoev\.com/(cfmotoservermine/|activity/) url script-request-header https://raw.githubusercontent.com/MonicaGmm/zeeho-quanx/main/task/zeeho_token.js
