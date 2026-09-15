@@ -13,8 +13,7 @@ ZEEHO(极核)App 每日自动签到脚本,以 QX 任务合集(JSON Gallery)的�
 https://raw.githubusercontent.com/MonicaGmm/zeeho-quanx/main/ZEEHO_Task.json
 ```
 
-> ⚠️ 上传仓库前,请把上面和 `ZEEHO_Task.json` 里的 `MonicaGmm`
-> 替换成你自己的 GitHub 用户名。
+把它复制到 Quantumult X 里,就能看到并勾选本合集下的任务(见下一节)。
 
 ## 二、在 Quantumult X 里添加
 
