@@ -308,6 +308,31 @@ function isOk(json) {
   return OK_CODES.indexOf(String(code)) >= 0;
 }
 
+/* 拉本月签到日历，统计「今日获得积分」「本月已签天数」
+ * 注意：integralScore 是「当天签到获得」的积分，不是账户总余额。
+ * 账户余额不在 H5 的接口里（H5 全部 22 个接口已逐一核过），
+ * 那是由原生 App 自己的接口返回的。 */
+function fetchCalendar(token) {
+  return apiRetry('/cfmotoservermine/signin/info', 'GET', token, { month: monthStr() })
+    .then(function (res) {
+      if (!res.json || !isOk(res.json)) return null;
+      var list = pick(res.json, 'data.nowSignDetailVos') || [];
+      var today = todayStr();
+      var todayScore = null;
+      var signed = 0;
+      list.forEach(function (d) {
+        if (!d) return;
+        if (Number(d.signStatue) === 3) signed++;
+        if (String(d.createDate) === today) {
+          var s = d.integralScore;
+          if (s !== null && s !== undefined && s !== '') todayScore = s;
+        }
+      });
+      return { todayScore: todayScore, monthSigned: signed };
+    })
+    .catch(function () { return null; });
+}
+
 /* ------------------------------ 单账号流程 ------------------------------ */
 function runOne(token, idx) {
   var tag = '账号' + (idx + 1);
@@ -341,7 +366,7 @@ function runOne(token, idx) {
         if (String(last).indexOf(todayStr()) === 0) {
           result.ok = true;
           result.dup = true;
-          result.msg = '今日已签到（连续 ' + result.days + ' 天）';
+          result.msg = '今日已签到';
           return result;
         }
       }
@@ -368,10 +393,10 @@ function runOne(token, idx) {
           if (last2.indexOf(todayStr()) === 0) {
             result.ok = true;
             if (postCode === '' || OK_CODES.indexOf(postCode) >= 0) {
-              result.msg = '签到成功（连续 ' + result.days + ' 天）';
+              result.msg = '签到成功';
             } else {
               result.dup = true;
-              result.msg = '今日已签到（连续 ' + result.days + ' 天）';
+              result.msg = '今日已签到';
             }
             return result;
           }
@@ -382,6 +407,15 @@ function runOne(token, idx) {
           return result;
         });
       });
+    });
+  }).then(function (r) {
+    /* 5. 补一次本月日历，拿到「今日获得积分」和「本月已签天数」 */
+    return fetchCalendar(token).then(function (cal) {
+      if (cal) {
+        r.todayScore = cal.todayScore;
+        r.monthSigned = cal.monthSigned;
+      }
+      return r;
     });
   }).catch(function (e) {
     result.msg = '异常: ' + ((e && e.message) || e);
@@ -421,7 +455,14 @@ function main() {
     else title = '部分成功 (' + okCount + '/' + total + ')';
 
     var body = results.map(function (r) {
-      return r.tag + ': ' + (r.ok ? (r.dup ? '·' : '+') : '×') + ' ' + r.msg;
+      var extra = [];
+      if (r.days !== undefined && r.days !== null) extra.push('连续 ' + r.days + ' 天');
+      if (r.todayScore !== undefined && r.todayScore !== null && r.todayScore !== '') {
+        extra.push('今日 +' + r.todayScore + ' 积分');
+      }
+      if (r.monthSigned !== undefined) extra.push('本月已签 ' + r.monthSigned + ' 天');
+      var line = r.tag + ': ' + (r.ok ? (r.dup ? '·' : '+') : '×') + ' ' + r.msg;
+      return extra.length ? line + '\n　　 ' + extra.join(' · ') : line;
     }).join('\n');
 
     /* 网络层失败时直接在通知里给出解法，省得回去翻文档 */
