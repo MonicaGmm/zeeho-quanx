@@ -42,7 +42,7 @@ https://raw.githubusercontent.com/MonicaGmm/zeeho-quanx/main/ZEEHO_Task.json
    ZEEHO 极核
    获取 TOKENS 成功
    来源：请求头
-   TOKEN：62da40f5…abeb
+   TOKEN：3f9a1c82…7b0d
    已保存，签到脚本会自动读取，无需手动填写。
    ```
 
@@ -132,7 +132,13 @@ host-suffix, zeehoev.com, direct
 - 内置 `Cfmoto-X-Sign` 请求签名
 - 多账号、失败重试、签到前状态预判、签到后回查确认
 - 通知带账号头像(media-url)
+- 通知里附带:连续签到天数、今日获得积分、本月已签天数
 - 网络层失败时会直接在通知里给出分流解法
+
+> **关于「可用积分余额」**:H5 的全部 22 个接口里**没有**返回账户积分余额的接口。
+> 签到接口返回的 `integralScore` 是**当天签到获得**的积分(前端源码里的提示语是
+> `恭喜获得${n}积分`),不是余额。账户余额由原生 App 自己的接口提供,
+> 用这里的 H5 token 取不到。通知里显示的因此是「今日 +N 积分」。
 
 **`task/zeeho_token.js`**
 
