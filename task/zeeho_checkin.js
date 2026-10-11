@@ -3,12 +3,18 @@
  *  ZEEHO 极核 · 每日自动签到
  *  ---------------------------------------------------------------------------
  *  运行环境 : Quantumult X  →  [task_local] 定时任务
- *  接口     : https://h5.zeehoev.com/cfmotoservermine/*
+ *  接口     : https://h5.zeehoev.com/cfmotoservermine/H5/*
  *  鉴权     : Authorization: Bearer <token>   (H5 端 token，UUID 格式)
  *  签名     : Cfmoto-X-Sign = md5( sha1(v) )
- *             v = 查询串 + 请求体 + "appId=Sw5F9uJi&nonce=<uuid>&timestamp=<ms>" + appSecret
+ *             v = 查询串 + 请求体 + "appId=AiTXmBrm&nonce=<uuid>&timestamp=<ms>" + appSecret
  *
  *  接口来源 : 用户 HAR 抓包 (2026-09-15)，签名算法从 H5 前端 JS 反推并 8/8 验证通过
+ *
+ *  更新记录 : 2026-10-11 修复 430 {"code":"30125","message":"permit error"}
+ *             —— 极核服务端轮换了 H5 通道密钥（appId/appSecret 换发），并把签到
+ *                相关接口迁移到 /cfmotoservermine/H5/ 前缀。旧 appId 或旧路径
+ *                均会被网关拦截为 30125 permit error。本次同步更换「密钥 + 路径」，
+ *                签名算法本身未变（md5(sha1(...)) 不变）。
  *
  *  免责声明 : 仅供个人学习与自用，请勿用于商业用途、批量账号或任何违规场景。
  * ============================================================================
@@ -30,8 +36,9 @@ const TOKENS = [
  * ========================================================================== */
 const CFG = {
   HOST: 'https://h5.zeehoev.com',
-  APP_ID: 'Sw5F9uJi',
-  APP_SECRET: '46870a8f678a09109468f5b0168818b91c292845',
+  /* H5 通道密钥：2026-10-10 服务端换发，旧值 AppID=Sw5F9uJi 已失效（返回 30125 permit error） */
+  APP_ID: 'AiTXmBrm',
+  APP_SECRET: '70c2c7458ab88ca9504ad0521f170075bc91f2f7',
 
   /* 设备指纹：删掉 deviceId 那段也行，服务端目前不校验 */
   ZEEHO_UA: 'MOBILE|iOS|18.7|ZEEHO_APP|3.0.4|iPhone|iPhone 17 Pro|402*874|{DEVICE_ID}|unknown|iOS',
@@ -313,7 +320,7 @@ function isOk(json) {
  * 账户余额不在 H5 的接口里（H5 全部 22 个接口已逐一核过），
  * 那是由原生 App 自己的接口返回的。 */
 function fetchCalendar(token) {
-  return apiRetry('/cfmotoservermine/signin/info', 'GET', token, { month: monthStr() })
+  return apiRetry('/cfmotoservermine/H5/signin/info', 'GET', token, { month: monthStr() })
     .then(function (res) {
       if (!res.json || !isOk(res.json)) return null;
       var list = pick(res.json, 'data.nowSignDetailVos') || [];
@@ -359,7 +366,7 @@ function runOne(token, idx) {
     }
 
     /* 2. 查签到状态，判断今天是否已签 */
-    return apiRetry('/cfmotoservermine/signin', 'GET', token).then(function (r2) {
+    return apiRetry('/cfmotoservermine/H5/signin', 'GET', token).then(function (r2) {
       if (r2.json && isOk(r2.json)) {
         var last = pick(r2.json, 'data.lastTime') || '';
         result.days = pick(r2.json, 'data.continueDays');
@@ -376,7 +383,7 @@ function runOne(token, idx) {
        *   code "10000"                  新签到成功
        *   code "repeatedly_operation"   重复操作 / 太频繁
        * 所以这里不看返回码下结论，一律回查真实签到状态。 */
-      return apiRetry('/cfmotoservermine/signin', 'POST', token).then(function (r3) {
+      return apiRetry('/cfmotoservermine/H5/signin', 'POST', token).then(function (r3) {
         var postCode = (r3.json && r3.json.code !== undefined) ? String(r3.json.code) : '';
         var postMsg = (r3.json && (r3.json.message || r3.json.msg)) || '';
 
@@ -386,7 +393,7 @@ function runOne(token, idx) {
         }
 
         /* 4. 回查签到状态，以它为准 */
-        return apiRetry('/cfmotoservermine/signin', 'GET', token).then(function (r4) {
+        return apiRetry('/cfmotoservermine/H5/signin', 'GET', token).then(function (r4) {
           var last2 = r4.json ? String(pick(r4.json, 'data.lastTime') || '') : '';
           result.days = r4.json ? pick(r4.json, 'data.continueDays') : undefined;
 
@@ -402,8 +409,10 @@ function runOne(token, idx) {
           }
 
           result.ok = false;
+          var isPermit = postCode === '30125' || postCode === '30121' || /permit error/i.test(String(postMsg));
           result.msg = '签到未生效：' + (postMsg || '未知') +
-                       (postCode ? ' (code ' + postCode + ')' : '');
+                       (postCode ? ' (code ' + postCode + ')' : '') +
+                       (isPermit ? '\n　　 ⚠️ 服务端接口凭证已变更，请更新脚本到最新版' : '');
           return result;
         });
       });
